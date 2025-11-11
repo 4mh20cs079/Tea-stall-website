@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<!--
+  Tea Stall Billing Web App (Single File)
+  How to run: Open this file (index.html) in any modern browser. No server needed.
+  Tech: Pure HTML, CSS, and vanilla JavaScript. No frameworks, no backend.
+  Notes:
+    - QR code is a placeholder SVG. No real payment verification is implemented.
+    - Orders are saved to localStorage under the key "teaStallOrders".
+    - Use "Export CSV" or "Export JSON" in Sales Log to download saved orders.
+    - To add menu items, edit the MENU_ITEMS array in the JS section below.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Tea Stall Billing</title>
+    <style>
+      :root {
+        --bg: #0f172a; /* slate-900 */
+        --panel: #111827; /* gray-900 */
+        --muted: #1f2937; /* gray-800 */
+        --text: #e5e7eb; /* gray-200 */
+        --subtle: #9ca3af; /* gray-400 */
+        --brand: #22c55e; /* green-500 */
+        --accent: #a78bfa; /* violet-400 */
+        --danger: #ef4444; /* red-500 */
+        --warn: #f59e0b; /* amber-500 */
+        --border: #334155; /* slate-700 */
+        --shadow: 0 8px 20px rgba(0,0,0,0.35);
+        --radius: 14px;
+        --touch: 48px;
+      }
+
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+        color: var(--text);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      a { color: inherit; }
+      button { cursor: pointer; }
+
+      .app {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 12px;
+        display: grid;
+        gap: 12px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: radial-gradient(1200px 300px at 30% -50%, rgba(124,58,237,0.15), transparent),
+                    radial-gradient(900px 250px at 90% -40%, rgba(34,197,94,0.12), transparent),
+                    var(--panel);
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .brand-logo {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: conic-gradient(from 180deg at 50% 50%, rgba(167,139,250,0.9), rgba(34,197,94,0.9), rgba(167,139,250,0.9));
+        box-shadow: inset 0 0 18px rgba(255,255,255,0.25), 0 10px 18px rgba(0,0,0,0.3);
+      }
+      h1 {
+        font-size: 17px;
+        margin: 0;
+        letter-spacing: 0.2px;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 6px;
+        background: rgba(255,255,255,0.03);
+        padding: 6px;
+        border-radius: 10px;
+      }
+      .tab-btn {
+        min-height: 36px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text);
+        font-weight: 600;
+      }
+      .tab-btn[aria-selected="true"] {
+        background: linear-gradient(180deg, rgba(34,197,94,0.18), rgba(34,197,94,0.08));
+        border-color: rgba(34,197,94,0.3);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      @media (min-width: 760px) {
+        .grid {
+          grid-template-columns: 1.1fr 0.9fr;
+        }
+      }
+
+      .card {
+        background: linear-gradient(180deg, rgba(17,24,39,0.9), rgba(15,23,42,0.95));
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+        box-shadow: var(--shadow);
+      }
+      .card h2 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+      }
+
+      .menu-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      @media (min-width: 560px) {
+        .menu-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      }
+      @media (min-width: 900px) {
+        .menu-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      }
+
+      .item-btn {
+        min-height: var(--touch);
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(31,41,55,0.65), rgba(17,24,39,0.9));
+        color: var(--text);
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        box-shadow: 0 2px 0 rgba(255,255,255,0.05) inset, 0 10px 16px rgba(0,0,0,0.35);
+      }
+      .item-btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .cart-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .cart-row {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto;
+        gap: 8px;
+        align-items: center;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        padding: 8px;
+        border-radius: 10px;
+      }
+      .qty-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: rgba(0,0,0,0.3);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 2px;
+      }
+      .qty-group button {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(31,41,55,0.65), rgba(17,24,39,0.9));
+        color: var(--text);
+        font-weight: 900;
+        box-shadow: 0 10px 16px rgba(0,0,0,0.35);
+      }
+      .qty-group input {
+        width: 42px;
+        height: 36px;
+        background: rgba(17,24,39,0.8);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        text-align: center;
+        font-weight: 700;
+      }
+
+      .money {
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+      }
+      .muted { color: var(--subtle); }
+
+      .totals {
+        display: grid;
+        gap: 8px;
+        padding-top: 8px;
+        border-top: 1px dashed var(--border);
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .grand {
+        font-size: 18px;
+        font-weight: 900;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .btn {
+        min-height: var(--touch);
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(34,197,94,0.22), rgba(34,197,94,0.08));
+        color: var(--text);
+        font-weight: 800;
+        letter-spacing: 0.3px;
+        box-shadow: 0 10px 16px rgba(0,0,0,0.35);
+      }
+      .btn.secondary {
+        background: linear-gradient(180deg, rgba(167,139,250,0.22), rgba(167,139,250,0.08));
+      }
+      .btn.warn {
+        background: linear-gradient(180deg, rgba(245,158,11,0.25), rgba(245,158,11,0.08));
+      }
+      .btn.danger {
+        background: linear-gradient(180deg, rgba(239,68,68,0.25), rgba(239,68,68,0.08));
+      }
+
+      /* Modal */
+      .modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+        background: rgba(2,6,23,0.72);
+        backdrop-filter: blur(6px);
+      }
+      .modal[open] {
+        display: flex;
+      }
+      .modal-card {
+        width: min(720px, 100%);
+        max-height: 88vh;
+        overflow: auto;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 14px;
+      }
+      .modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px dashed var(--border);
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+      }
+      .bill-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      .bill-table th, .bill-table td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px dashed var(--border);
+      }
+      .bill-footer {
+        display: grid;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .qr {
+        width: 160px;
+        height: 160px;
+        border-radius: 12px;
+        background: radial-gradient(400px 100px at 30% -10%, rgba(167,139,250,0.2), transparent),
+                    radial-gradient(200px 60px at 90% -10%, rgba(34,197,94,0.2), transparent),
+                    rgba(255,255,255,0.02);
+        border: 1px dashed var(--border);
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .bill-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      /* Sales Log */
+      .log-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .log-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .log-table th, .log-table td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px dashed var(--border);
+      }
+
+      /* Print styles for bill */
+      @media print {
+        body { background: #fff; }
+        header, .tabs, .grid > :not(#billModal) { display: none !important; }
+        .modal { position: static; display: block !important; background: none; padding: 0; }
+        .modal-card { width: 100%; max-height: none; border: none; box-shadow: none; }
+        .bill-actions { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app" role="application">
+      <header>
+        <div class="brand" aria-label="App title">
+          <div class="brand-logo" aria-hidden="true"></div>
+          <div>
+            <h1>Tea Stall Billing</h1>
+            <div class="muted" style="font-size:12px;">Fast, simple POS • Offline ready</div>
+          </div>
+        </div>
+        <nav class="tabs" aria-label="Views">
+          <button id="tab-pos" class="tab-btn" aria-selected="true" aria-controls="view-pos">POS</button>
+          <button id="tab-log" class="tab-btn" aria-selected="false" aria-controls="view-log">Sales Log</button>
+        </nav>
+      </header>
+
+      <!-- POS VIEW -->
+      <section id="view-pos" class="grid" role="region" aria-label="Point of Sale">
+        <div class="card" aria-labelledby="menu-heading">
+          <h2 id="menu-heading">Menu</h2>
+          <div id="menu" class="menu-grid" role="group" aria-label="Items"></div>
+          <div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
+            <h3 style="margin:0 0 8px 0; font-size:14px;">Add New Item</h3>
+            <form id="addItemForm" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;" aria-label="Add new menu item">
+              <input id="newItemName" required placeholder="Name" aria-label="Item name" style="height:36px;border-radius:8px;border:1px solid var(--border);background:rgba(17,24,39,0.8);color:var(--text);padding:0 10px;" />
+              <input id="newItemPrice" required inputmode="decimal" placeholder="Price (₹)" aria-label="Item price" style="height:36px;border-radius:8px;border:1px solid var(--border);background:rgba(17,24,39,0.8);color:var(--text);padding:0 10px;" />
+              <input id="newItemImg" placeholder="Image URL (optional)" aria-label="Image URL" style="grid-column: span 2; height:36px;border-radius:8px;border:1px solid var(--border);background:rgba(17,24,39,0.8);color:var(--text);padding:0 10px;" />
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; grid-column: span 2;">
+                <button class="btn" type="submit">Add Item</button>
+                <button class="btn secondary" type="button" id="manageMenuBtn" title="Edit existing items">Manage Menu</button>
+                <button class="btn warn" type="button" id="resetMenuBtn" title="Restore default menu">Reset Menu</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="card" aria-labelledby="cart-heading">
+          <h2 id="cart-heading">Cart</h2>
+          <div id="cartList" class="cart-list"></div>
+          <div class="totals" aria-live="polite">
+            <div class="row"><span class="muted">Subtotal</span><span class="money" id="subtotal">₹0.00</span></div>
+            <div class="row"><span class="muted">Tax (0%)</span><span class="money" id="tax">₹0.00</span></div>
+            <div class="row grand"><span>Total</span><span class="money" id="grand">₹0.00</span></div>
+          </div>
+          <div class="actions">
+            <button id="btn-generate" class="btn" title="Open bill view">Generate Bill</button>
+            <button id="btn-clear" class="btn danger" title="Clear current cart">Clear Cart</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SALES LOG VIEW -->
+      <section id="view-log" class="card" hidden role="region" aria-label="Sales log">
+        <h2>Sales Log</h2>
+        <div class="log-actions">
+          <button id="btn-export-csv" class="btn secondary">Export CSV</button>
+          <button id="btn-export-json" class="btn secondary">Export JSON</button>
+          <button id="btn-clear-orders" class="btn warn">Clear Saved Orders</button>
+        </div>
+        <div style="overflow:auto;">
+          <table class="log-table" aria-describedby="sales-summary">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Items</th>
+                <th>Total (₹)</th>
+              </tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+        <div id="sales-summary" class="muted" style="margin-top:8px;font-size:12px;">Loaded from localStorage: teaStallOrders</div>
+      </section>
+    </div>
+
+    <!-- BILL MODAL -->
+    <dialog id="billModal" class="modal" aria-labelledby="bill-title" aria-modal="true">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <div style="font-weight:900;">Tea Stall Bill</div>
+            <div id="billTime" class="muted" style="font-size:12px;"></div>
+          </div>
+          <button id="btn-close-bill" class="btn secondary" formmethod="dialog">Close</button>
+        </div>
+        <div id="billItemsWrap" style="overflow:auto; margin-bottom:10px;">
+          <table class="bill-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody id="billBody"></tbody>
+          </table>
+        </div>
+        <div class="row">
+          <div>
+            <div class="muted" style="font-size:12px;">Scan to pay (placeholder)</div>
+            <div class="qr" aria-label="QR placeholder" title="QR placeholder">
+              <!-- Simple QR-like SVG placeholder -->
+              <svg width="140" height="140" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect x="0" y="0" width="140" height="140" fill="#0b1220"/>
+                <rect x="6" y="6" width="40" height="40" fill="#e5e7eb"/>
+                <rect x="10" y="10" width="16" height="16" fill="#0b1220"/>
+                <rect x="28" y="28" width="12" height="12" fill="#0b1220"/>
+                <rect x="94" y="6" width="40" height="40" fill="#e5e7eb"/>
+                <rect x="98" y="10" width="16" height="16" fill="#0b1220"/>
+                <rect x="116" y="28" width="12" height="12" fill="#0b1220"/>
+                <rect x="6" y="94" width="40" height="40" fill="#e5e7eb"/>
+                <rect x="10" y="98" width="16" height="16" fill="#0b1220"/>
+                <rect x="28" y="116" width="12" height="12" fill="#0b1220"/>
+                <rect x="56" y="56" width="10" height="10" fill="#e5e7eb"/>
+                <rect x="70" y="56" width="6" height="6" fill="#e5e7eb"/>
+                <rect x="84" y="56" width="10" height="10" fill="#e5e7eb"/>
+                <rect x="56" y="72" width="6" height="6" fill="#e5e7eb"/>
+                <rect x="66" y="72" width="10" height="10" fill="#e5e7eb"/>
+                <rect x="82" y="72" width="6" height="6" fill="#e5e7eb"/>
+                <rect x="94" y="72" width="10" height="10" fill="#e5e7eb"/>
+                <rect x="56" y="88" width="10" height="10" fill="#e5e7eb"/>
+                <rect x="72" y="88" width="6" height="6" fill="#e5e7eb"/>
+                <rect x="84" y="88" width="10" height="10" fill="#e5e7eb"/>
+              </svg>
+            </div>
+            <a id="upiLink" class="btn" style="display:inline-grid; place-items:center; margin-top:8px; text-decoration:none;" href="#" target="_blank" rel="noopener">
+              Open UPI App
+            </a>
+          </div>
+          <div style="text-align:right;">
+            <div class="row"><span class="muted">Subtotal</span><span class="money" id="billSubtotal">₹0.00</span></div>
+            <div class="row"><span class="muted">Tax (0%)</span><span class="money" id="billTax">₹0.00</span></div>
+            <div class="row grand"><span>Total</span><span class="money" id="billGrand">₹0.00</span></div>
+          </div>
+        </div>
+        <div class="bill-actions" style="margin-top:10px;">
+          <button id="btn-complete" class="btn">Complete / Save Order</button>
+          <button id="btn-print" class="btn secondary">Print</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- MANAGE MENU MODAL -->
+    <dialog id="manageMenuModal" class="modal" aria-labelledby="manage-title" aria-modal="true">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <div style="font-weight:900;" id="manage-title">Manage Menu</div>
+            <div class="muted" style="font-size:12px;">Edit names, prices, and images</div>
+          </div>
+          <button id="btn-close-manage" class="btn secondary" formmethod="dialog">Close</button>
+        </div>
+        <div id="manageList" style="display:grid; gap:8px;"></div>
+      </div>
+    </dialog>
+
+    <script>
+      // -----------------------
+      // Configuration
+      // -----------------------
+      // To add/edit menu items, update this array. Prices in INR.
+      const MENU_ITEMS = [
+        { id: "tea", name: "Tea", price: 10, img: "https://www.sharmispassions.com/wp-content/uploads/2012/12/cardamom-tea4.jpg" },
+        { id: "coffee", name: "Coffee", price: 10, img: "https://munchmalaysia.com/wp-content/uploads/2023/06/big-basket.webp" },
+        { id: "lemon-tea", name: "Lemon Tea", price: 15, img: "https://teacultureoftheworld.com/cdn/shop/files/Image1.jpg?v=1699359685" },
+        { id: "boost", name: "Boost", price: 15, img: "https://i.ytimg.com/vi/Ehz2Zm7PIx4/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLDlO1WoZTrDcRPXVS1cjeUUnHYdwA" },
+        { id: "horlicks", name: "Horlicks", price: 15, img: "data:image/jpeg;base64,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" },
+        { id: "black-tea", name: "Black Tea", price: 10, img: "" },
+        { id: "malt", name: "Malt", price: 10, img: "https://picsum.photos/seed/malt/200" },
+        { id: "milk", name: "Milk", price: 10, img: "https://picsum.photos/seed/milk/200" },
+        { id: "bun", name: "Bun", price: 5, img: "https://picsum.photos/seed/bun/200" },
+        { id: "biscuit", name: "Biscuits", price: 3, img: "https://picsum.photos/seed/biscuit/200" },
+        { id: "chakli", name: "chakli", price: 5, img: "https://picsum.photos/seed/chakli/200" },
+        { id: "madhur-vada", name: "Madhur-Vada", price: 12, img: "https://picsum.photos/seed/vada/200" },
+        { id: "cake", name: "Cake", price: 10, img: "https://picsum.photos/seed/cake/200" }
+
+      ];
+      const STORAGE_KEY = "teaStallOrders";
+      const MENU_STORAGE_KEY = "teaStallMenu";
+      const TAX_RATE = 0; // 0% tax; change if needed (e.g., 5)
+
+      // -----------------------
+      // State
+      // -----------------------
+      let cart = new Map(); // key: item.id, value: { id, name, price, qty }
+
+      // -----------------------
+      // DOM refs
+      // -----------------------
+      const menuEl = document.getElementById("menu");
+      const cartListEl = document.getElementById("cartList");
+      const subtotalEl = document.getElementById("subtotal");
+      const taxEl = document.getElementById("tax");
+      const grandEl = document.getElementById("grand");
+
+      const btnGenerate = document.getElementById("btn-generate");
+      const btnClear = document.getElementById("btn-clear");
+
+      const billModal = document.getElementById("billModal");
+      const billBodyEl = document.getElementById("billBody");
+      const billSubtotalEl = document.getElementById("billSubtotal");
+      const billTaxEl = document.getElementById("billTax");
+      const billGrandEl = document.getElementById("billGrand");
+      const billTimeEl = document.getElementById("billTime");
+      const upiLinkEl = document.getElementById("upiLink");
+      const btnComplete = document.getElementById("btn-complete");
+      const btnPrint = document.getElementById("btn-print");
+      const btnCloseBill = document.getElementById("btn-close-bill");
+
+      // Manage Menu
+      const manageMenuBtn = document.getElementById("manageMenuBtn");
+      const manageMenuModal = document.getElementById("manageMenuModal");
+      const manageList = document.getElementById("manageList");
+      const btnCloseManage = document.getElementById("btn-close-manage");
+
+      const tabPos = document.getElementById("tab-pos");
+      const tabLog = document.getElementById("tab-log");
+      const viewPos = document.getElementById("view-pos");
+      const viewLog = document.getElementById("view-log");
+      const logBodyEl = document.getElementById("logBody");
+      const btnExportCsv = document.getElementById("btn-export-csv");
+      const btnExportJson = document.getElementById("btn-export-json");
+      const btnClearOrders = document.getElementById("btn-clear-orders");
+
+      // -----------------------
+      // Utilities
+      // -----------------------
+      const formatMoney = (value) => "₹" + value.toFixed(2);
+      const getCartItems = () => Array.from(cart.values());
+      const calcTotals = () => {
+        const subtotal = getCartItems().reduce((sum, it) => sum + it.price * it.qty, 0);
+        const tax = subtotal * (TAX_RATE / 100);
+        const grand = subtotal + tax;
+        return { subtotal, tax, grand };
+      };
+      const uid = (prefix = "id") => prefix + "_" + Math.random().toString(36).slice(2, 8);
+      const svgPlaceholder = (label) => {
+        const text = encodeURIComponent(label || "Item");
+        const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
+  <defs>
+    <linearGradient id='g' x1='0' x2='1' y1='0' y2='1'>
+      <stop offset='0%' stop-color='#1f2937'/>
+      <stop offset='100%' stop-color='#0b1220'/>
+    </linearGradient>
+  </defs>
+  <rect width='100%' height='100%' fill='url(#g)'/>
+  <g fill='none' stroke='#334155' opacity='0.6'>
+    <path d='M0 20 H200 M0 60 H200 M0 100 H200 M0 140 H200 M0 180 H200'/>
+  </g>
+  <text x='100' y='110' font-family='Segoe UI,Arial,sans-serif' font-size='20' fill='#e5e7eb' text-anchor='middle'>${text}</text>
+</svg>`;
+        return "data:image/svg+xml;utf8," + svg;
+      };
+
+      // Persist menu (including user-added items)
+      function readMenu() {
+        try {
+          const raw = localStorage.getItem(MENU_STORAGE_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : null;
+        } catch {
+          return null;
+        }
+      }
+      function writeMenu(items) {
+        localStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(items));
+      }
+
+      // -----------------------
+      // Rendering
+      // -----------------------
+      let currentMenu = null; // loaded menu (defaults or from storage)
+
+      function ensureMenuLoaded() {
+        if (!currentMenu) {
+          currentMenu = readMenu() || MENU_ITEMS.slice();
+          // If stored menu missing img, backfill with an inline SVG placeholder (offline-safe)
+          currentMenu = currentMenu.map((it) => ({
+            ...it,
+            img: it.img || svgPlaceholder(it.name),
+          }));
+          writeMenu(currentMenu);
+        }
+      }
+
+      function renderMenu() {
+        ensureMenuLoaded();
+        menuEl.innerHTML = "";
+        currentMenu.forEach((item, idx) => {
+          const btn = document.createElement("button");
+          btn.className = "item-btn";
+          btn.setAttribute("data-id", item.id);
+          btn.setAttribute("title", `Add ${item.name}`);
+          btn.innerHTML = `
+            <img src="${item.img}" alt="${item.name}" style="width:100%;height:84px;object-fit:cover;border-radius:10px;margin-bottom:6px;border:1px solid var(--border);" onerror="this.onerror=null; this.src='${svgPlaceholder(item.name)}';" />
+            <div style="font-weight:800;">${item.name}</div>
+            <div class="muted" style="font-size:12px;">₹${item.price}</div>
+          `;
+          btn.addEventListener("click", () => addItemToCart(item.id));
+          btn.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              addItemToCart(item.id);
+            }
+          });
+          btn.setAttribute("aria-label", `${item.name} rupees ${item.price}`);
+          btn.setAttribute("tabindex", "0");
+          menuEl.appendChild(btn);
+        });
+      }
+
+      // -----------------------
+      // Manage Menu (Edit Items)
+      // -----------------------
+      function openManageMenu() {
+        ensureMenuLoaded();
+        renderManageList();
+        if (typeof manageMenuModal.showModal === "function") {
+          manageMenuModal.showModal();
+        } else {
+          manageMenuModal.setAttribute("open", "");
+        }
+      }
+
+      function closeManageMenu() {
+        if (typeof manageMenuModal.close === "function") {
+          try { manageMenuModal.close(); } catch {}
+        }
+        manageMenuModal.removeAttribute("open");
+      }
+
+      function renderManageList() {
+        manageList.innerHTML = "";
+        currentMenu.forEach((it) => {
+          const row = document.createElement("div");
+          row.className = "cart-row";
+          row.style.gridTemplateColumns = "auto 1fr auto";
+          row.innerHTML = `
+            <img src="${it.img}" alt="${it.name}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border);" />
+            <div style="display:grid; gap:6px;">
+              <div style="display:grid; grid-template-columns: 1fr 120px; gap:6px;">
+                <input value="${it.name}" data-field="name" aria-label="Name" style="height:32px;border-radius:8px;border:1px solid var(--border);background:rgba(17,24,39,0.8);color:var(--text);padding:0 8px;" />
+                <input value="${it.price}" data-field="price" inputmode="decimal" aria-label="Price" style="height:32px;border-radius:8px;border:1px solid var(--border);background:rgba(17,24,39,0.8);color:var(--text);padding:0 8px;" />
+              </div>
+              <input value="${it.img}" data-field="img" aria-label="Image URL" style="height:32px;border-radius:8px;border:1px solid var(--border);background:rgba(17,24,39,0.8);color:var(--text);padding:0 8px;" />
+              <div style="display:flex; gap:6px; align-items:center;">
+                <input type="file" accept="image/*" data-field="file" aria-label="Upload image" />
+                <button class="btn secondary" data-action="save">Save</button>
+                <button class="btn danger" data-action="delete">Delete</button>
+              </div>
+            </div>
+            <div class="money">₹${(it.price).toFixed(2)}</div>
+          `;
+
+          // Hook file upload to convert to data URL and set into img input
+          const fileInput = row.querySelector('[data-field="file"]');
+          const imgInput = row.querySelector('[data-field="img"]');
+          fileInput.addEventListener("change", (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+              imgInput.value = reader.result; // data URL
+            };
+            reader.readAsDataURL(file);
+          });
+
+          // Save action
+          row.querySelector('[data-action="save"]').addEventListener("click", () => {
+            const name = row.querySelector('[data-field="name"]').value.trim();
+            const priceVal = parseFloat(row.querySelector('[data-field="price"]').value);
+            const img = imgInput.value.trim();
+            if (!name || !Number.isFinite(priceVal) || priceVal <= 0) {
+              alert("Please enter a valid name and price.");
+              return;
+            }
+            it.name = name;
+            it.price = Math.round(priceVal * 100) / 100;
+            it.img = img || it.img;
+            writeMenu(currentMenu);
+            renderMenu();
+            renderManageList();
+          });
+
+          // Delete action
+          row.querySelector('[data-action="delete"]').addEventListener("click", () => {
+            if (!confirm(`Delete "${it.name}" from menu?`)) return;
+            currentMenu = currentMenu.filter((m) => m.id !== it.id);
+            writeMenu(currentMenu);
+            renderMenu();
+            renderManageList();
+          });
+
+          manageList.appendChild(row);
+        });
+        if (currentMenu.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "muted";
+          empty.textContent = "No items. Add items from the POS view.";
+          manageList.appendChild(empty);
+        }
+      }
+
+      function renderCart() {
+        cartListEl.innerHTML = "";
+        getCartItems().forEach((it) => {
+          const row = document.createElement("div");
+          row.className = "cart-row";
+          row.innerHTML = `
+            <div>
+              <div style="font-weight:800;">${it.name}</div>
+              <div class="muted" style="font-size:12px;">₹${it.price} each</div>
+            </div>
+            <div class="qty-group" aria-label="Quantity controls">
+              <button class="dec" title="Decrease" aria-label="Decrease">-</button>
+              <input class="qty" inputmode="numeric" pattern="[0-9]*" value="${it.qty}" aria-label="Quantity input" />
+              <button class="inc" title="Increase" aria-label="Increase">+</button>
+            </div>
+            <div class="money">₹${(it.price * it.qty).toFixed(2)}</div>
+            <button class="btn danger remove" title="Remove" aria-label="Remove item">Remove</button>
+          `;
+          // Qty handlers
+          row.querySelector(".dec").addEventListener("click", () => updateQty(it.id, it.qty - 1));
+          row.querySelector(".inc").addEventListener("click", () => updateQty(it.id, it.qty + 1));
+          row.querySelector(".qty").addEventListener("change", (e) => {
+            const val = parseInt(e.target.value, 10);
+            updateQty(it.id, Number.isFinite(val) ? val : it.qty);
+          });
+          row.querySelector(".remove").addEventListener("click", () => removeItemFromCart(it.id));
+          cartListEl.appendChild(row);
+        });
+        updateTotalsDisplay();
+      }
+
+      function updateTotalsDisplay() {
+        const { subtotal, tax, grand } = calcTotals();
+        subtotalEl.textContent = formatMoney(subtotal);
+        taxEl.textContent = formatMoney(tax);
+        grandEl.textContent = formatMoney(grand);
+      }
+
+      // -----------------------
+      // Cart Operations
+      // -----------------------
+      // addItemToCart: Adds item or increases quantity if it already exists
+      function addItemToCart(itemId) {
+        ensureMenuLoaded();
+        const item = currentMenu.find((m) => m.id === itemId);
+        if (!item) return;
+        if (cart.has(item.id)) {
+          const cur = cart.get(item.id);
+          cur.qty += 1;
+        } else {
+          cart.set(item.id, { id: item.id, name: item.name, price: item.price, qty: 1 });
+        }
+        renderCart();
+      }
+
+      // updateQty: Updates quantity; removes item if qty < 1
+      function updateQty(itemId, newQty) {
+        if (!cart.has(itemId)) return;
+        const qty = Math.max(0, Math.floor(newQty || 0));
+        if (qty < 1) {
+          cart.delete(itemId);
+        } else {
+          const it = cart.get(itemId);
+          it.qty = qty;
+        }
+        renderCart();
+      }
+
+      // removeItemFromCart: Removes an item entirely
+      function removeItemFromCart(itemId) {
+        cart.delete(itemId);
+        renderCart();
+      }
+
+      function clearCart() {
+        cart.clear();
+        renderCart();
+      }
+
+      // -----------------------
+      // Bill Generation
+      // -----------------------
+      function openBillModal() {
+        const items = getCartItems();
+        if (items.length === 0) {
+          alert("Cart is empty.");
+          return;
+        }
+        billBodyEl.innerHTML = "";
+        items.forEach((it) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${it.name}</td>
+            <td>${it.qty}</td>
+            <td>${formatMoney(it.price)}</td>
+            <td class="money">${formatMoney(it.price * it.qty)}</td>
+          `;
+          billBodyEl.appendChild(tr);
+        });
+        const { subtotal, tax, grand } = calcTotals();
+        billSubtotalEl.textContent = formatMoney(subtotal);
+        billTaxEl.textContent = formatMoney(tax);
+        billGrandEl.textContent = formatMoney(grand);
+
+        const now = new Date();
+        billTimeEl.textContent = now.toLocaleString();
+
+        // Optional UPI deeplink (no verification)
+        const merchant = "upi";
+        const vpa = "merchant@upi"; // placeholder
+        const tn = encodeURIComponent("Tea Stall Order");
+        const am = encodeURIComponent(grand.toFixed(2));
+        const upiURL = `upi://pay?pa=${vpa}&pn=${merchant}&tn=${tn}&am=${am}&cu=INR`;
+        upiLinkEl.href = upiURL;
+
+        if (typeof billModal.showModal === "function") {
+          billModal.showModal();
+        } else {
+          billModal.setAttribute("open", "");
+        }
+      }
+
+      // -----------------------
+      // Save Order & Persistence
+      // -----------------------
+      // saveCurrentOrder: Saves order to localStorage and clears cart
+      function saveCurrentOrder() {
+        const items = getCartItems();
+        if (items.length === 0) {
+          alert("Nothing to save. Cart is empty.");
+          return;
+        }
+        const { subtotal, tax, grand } = calcTotals();
+        const order = {
+          id: "ord_" + Date.now(),
+          timestamp: Date.now(),
+          items: items.map(({ id, name, price, qty }) => ({ id, name, price, qty })),
+          totals: { subtotal, tax, grand }
+        };
+        const existing = readOrders();
+        existing.push(order);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+        clearCart();
+        closeBill();
+        alert("Order saved.");
+        if (!viewLog.hasAttribute("hidden")) {
+          renderSalesLog();
+        }
+      }
+
+      function readOrders() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function clearOrders() {
+        if (!confirm("Clear all saved orders?")) return;
+        localStorage.removeItem(STORAGE_KEY);
+        renderSalesLog();
+      }
+
+      // -----------------------
+      // Export Helpers
+      // -----------------------
+      // downloadJSON: Provides a JSON download of saved orders
+      function downloadJSON() {
+        const orders = readOrders();
+        const blob = new Blob([JSON.stringify(orders, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        triggerDownload(url, "tea-stall-orders.json");
+        URL.revokeObjectURL(url);
+      }
+
+      // downloadCSV: Provides a CSV download of saved orders
+      // Columns: orderId, date, time, itemCount, total
+      function downloadCSV() {
+        const orders = readOrders();
+        const header = ["orderId", "date", "time", "itemCount", "total"];
+        const rows = orders.map((o) => {
+          const d = new Date(o.timestamp);
+          const date = d.toLocaleDateString();
+          const time = d.toLocaleTimeString();
+          const itemCount = o.items.reduce((n, it) => n + it.qty, 0);
+          const total = o.totals?.grand ?? 0;
+          return [o.id, date, time, itemCount, total.toFixed(2)];
+        });
+        const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        triggerDownload(url, "tea-stall-orders.csv");
+        URL.revokeObjectURL(url);
+      }
+
+      function triggerDownload(url, filename) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+
+      // -----------------------
+      // Sales Log
+      // -----------------------
+      function renderSalesLog() {
+        const orders = readOrders().sort((a, b) => b.timestamp - a.timestamp);
+        logBodyEl.innerHTML = "";
+        orders.forEach((o) => {
+          const d = new Date(o.timestamp);
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${d.toLocaleDateString()}</td>
+            <td>${d.toLocaleTimeString()}</td>
+            <td>${o.items.length} items</td>
+            <td class="money">${(o.totals?.grand ?? 0).toFixed(2)}</td>
+          `;
+          logBodyEl.appendChild(tr);
+        });
+        if (orders.length === 0) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = '<td colspan="4" class="muted">No saved orders yet.</td>';
+          logBodyEl.appendChild(tr);
+        }
+      }
+
+      // -----------------------
+      // Modal helpers
+      // -----------------------
+      function closeBill() {
+        if (typeof billModal.close === "function") {
+          try { billModal.close(); } catch {}
+        }
+        billModal.removeAttribute("open");
+      }
+
+      // -----------------------
+      // Event wiring
+      // -----------------------
+      btnGenerate.addEventListener("click", openBillModal);
+      btnClear.addEventListener("click", clearCart);
+      btnComplete.addEventListener("click", saveCurrentOrder);
+      btnPrint.addEventListener("click", () => window.print());
+      btnCloseBill.addEventListener("click", closeBill);
+
+      tabPos.addEventListener("click", () => {
+        tabPos.setAttribute("aria-selected", "true");
+        tabLog.setAttribute("aria-selected", "false");
+        viewPos.removeAttribute("hidden");
+        viewLog.setAttribute("hidden", "");
+      });
+      tabLog.addEventListener("click", () => {
+        tabPos.setAttribute("aria-selected", "false");
+        tabLog.setAttribute("aria-selected", "true");
+        viewPos.setAttribute("hidden", "");
+        viewLog.removeAttribute("hidden");
+        renderSalesLog();
+      });
+
+      btnExportCsv.addEventListener("click", downloadCSV);
+      btnExportJson.addEventListener("click", downloadJSON);
+      btnClearOrders.addEventListener("click", clearOrders);
+
+      // Init
+      renderMenu();
+      renderCart();
+
+      // Add Item form handlers
+      const addItemForm = document.getElementById("addItemForm");
+      const newItemName = document.getElementById("newItemName");
+      const newItemPrice = document.getElementById("newItemPrice");
+      const newItemImg = document.getElementById("newItemImg");
+      const resetMenuBtn = document.getElementById("resetMenuBtn");
+      const manageMenuTrigger = document.getElementById("manageMenuBtn");
+
+      function resetAddForm() {
+        newItemName.value = "";
+        newItemPrice.value = "";
+        newItemImg.value = "";
+      }
+
+      addItemForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        ensureMenuLoaded();
+        const name = newItemName.value.trim();
+        const price = parseFloat(newItemPrice.value);
+        const img = (newItemImg.value || "").trim();
+        if (!name || !Number.isFinite(price) || price <= 0) {
+          alert("Please enter a valid name and price.");
+          return;
+        }
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || uid("item");
+        const exists = currentMenu.some((m) => m.id === id);
+        const itemId = exists ? uid(id) : id;
+        const item = {
+          id: itemId,
+          name,
+          price: Math.round(price * 100) / 100,
+          img: img || `https://picsum.photos/seed/${itemId}/200`,
+        };
+        currentMenu.push(item);
+        writeMenu(currentMenu);
+        renderMenu();
+        resetAddForm();
+        alert("Item added to menu.");
+      });
+
+      resetMenuBtn.addEventListener("click", () => {
+        if (!confirm("Restore default menu? This will remove custom items.")) return;
+        localStorage.removeItem(MENU_STORAGE_KEY);
+        currentMenu = null;
+        renderMenu();
+        alert("Menu restored.");
+      });
+
+      // Manage Menu wiring
+      manageMenuTrigger.addEventListener("click", openManageMenu);
+      btnCloseManage.addEventListener("click", closeManageMenu);
+    </script>
+  </body>
+</html>
+
